@@ -18,14 +18,41 @@ const PERIODS: Array<{ key: Period; label: string }> = [
   { key: 'last_year', label: '১ বছর' },
 ]
 
+// Mirrors /api/publisher/revenue. ⚠️ This interface used to name fields the
+// route never returned (`grossRevenue`, `netRevenue`, `netAmount`), so every
+// figure on this screen rendered as ০ regardless of what the stall had sold.
+// Keep it in step with the route, not with what looks plausible.
 interface RevenueData {
-  summary: { grossRevenue: number; commission: number; netRevenue: number; totalOrders: number; currency: string }
-  recentTransactions: Array<{ orderId: string; bookTitleBn: string; netAmount: number; currency: string; orderStatus: string }>
+  summary: {
+    totalRevenue: number
+    totalCommission: number
+    totalPayout: number
+    totalOrders: number
+    totalUnitsSold: number
+    currency: string
+  }
+  recentTransactions: Array<{
+    orderId: string
+    bookTitleBn: string
+    quantity: number
+    revenue: number
+    commission: number
+    net: number
+    date: string
+    orderStatus: string
+  }>
   payouts: Array<{ id: string; netPayout: number; currency: string; status: string; periodEnd: string }>
 }
 
+/** ISO timestamp -> YYYY-MM-DD. The API sends full ISO; a payout row wants a date. */
+function dateOnly(iso: string) {
+  return iso.slice(0, 10)
+}
+
 function money(amount: number, currency: string) {
-  return `${currency === 'INR' ? '৳' : currency} ${Math.round(amount).toLocaleString('bn-BD')}`
+  // ₹ for INR, ৳ for BDT — these were the wrong way round.
+  const symbol = currency === 'INR' ? '₹' : currency === 'BDT' ? '৳' : currency
+  return `${symbol} ${Math.round(amount).toLocaleString('bn-BD')}`
 }
 
 export default function RevenueScreen() {
@@ -61,9 +88,9 @@ export default function RevenueScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.navy} />}
         >
           <View style={styles.grid}>
-            <StatTile label="মোট আয়" value={money(data?.data.summary.grossRevenue ?? 0, data?.data.summary.currency ?? 'INR')} />
-            <StatTile label="নিট আয়" value={money(data?.data.summary.netRevenue ?? 0, data?.data.summary.currency ?? 'INR')} />
-            <StatTile label="কমিশন" value={money(data?.data.summary.commission ?? 0, data?.data.summary.currency ?? 'INR')} />
+            <StatTile label="মোট আয়" value={money(data?.data.summary.totalRevenue ?? 0, data?.data.summary.currency ?? 'INR')} />
+            <StatTile label="নিট আয়" value={money(data?.data.summary.totalPayout ?? 0, data?.data.summary.currency ?? 'INR')} />
+            <StatTile label="কমিশন" value={money(data?.data.summary.totalCommission ?? 0, data?.data.summary.currency ?? 'INR')} />
             <StatTile label="অর্ডার" value={String(data?.data.summary.totalOrders ?? 0)} />
           </View>
 
@@ -71,7 +98,7 @@ export default function RevenueScreen() {
           <Card style={{ padding: 0 }}>
             {(data?.data.payouts ?? []).map((p, idx, arr) => (
               <View key={p.id} style={[styles.row, idx < arr.length - 1 && styles.rowBorder]}>
-                <Text style={styles.rowTitle}>{p.periodEnd}</Text>
+                <Text style={styles.rowTitle}>{dateOnly(p.periodEnd)}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <Text style={styles.rowValue}>{money(p.netPayout, p.currency)}</Text>
                   <Badge label={p.status} tone={p.status === 'PAID' ? 'success' : 'neutral'} />
@@ -84,9 +111,9 @@ export default function RevenueScreen() {
           <Text style={styles.sectionTitle}>লেনদেন</Text>
           <Card style={{ padding: 0 }}>
             {(data?.data.recentTransactions ?? []).slice(0, 20).map((t, idx, arr) => (
-              <View key={t.orderId + t.bookTitleBn} style={[styles.row, idx < arr.length - 1 && styles.rowBorder]}>
+              <View key={`${t.orderId}-${t.bookTitleBn}-${idx}`} style={[styles.row, idx < arr.length - 1 && styles.rowBorder]}>
                 <Text style={styles.rowTitle} numberOfLines={1}>{t.bookTitleBn}</Text>
-                <Text style={styles.rowValue}>{money(t.netAmount, t.currency)}</Text>
+                <Text style={styles.rowValue}>{money(t.net, data?.data.summary.currency ?? 'INR')}</Text>
               </View>
             ))}
             {(data?.data.recentTransactions ?? []).length === 0 ? <Text style={styles.emptyText}>এখনো কোনো লেনদেন নেই</Text> : null}

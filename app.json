@@ -18,6 +18,12 @@
         {
           "fonts": []
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ভালো ভাষা অ্যাডমিন অ্যাপ বই বা পণ্যের ছবি আপলোড করতে আপনার গ্যালারিতে ঢুকতে চায়।"
+        }
       ]
     ],
     "ios": {
@@ -37,6 +43,12 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3b7a275b-9e33-4560-9162-e734162139be"
+      }
     }
   }
 }

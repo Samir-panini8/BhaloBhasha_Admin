@@ -1,47 +1,35 @@
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { ScrollView, View, Text, TextInput, StyleSheet, Alert } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Card } from '@/components/Card'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
+import { LoadingView, ErrorState } from '@/components/States'
 import { api, ApiError } from '@/lib/api'
+import { useApiQuery } from '@/lib/use-api-query'
+import { findInPagedList } from '@/lib/find-in-list'
+import { fetchPublisherAppsPage, type PublisherApp } from '@/lib/admin-lists'
+import { formatDateBn, ORG_TYPE_BN } from '@/lib/types'
 import { colors, fonts, spacing } from '@/lib/theme'
 
-interface AppItem {
-  id: string
-  nameBn: string
-  nameEn: string
-  type: string
-  country: string
-  phone: string
-  email: string | null
-  website: string | null
-  registrationNumber: string | null
-  representativeBooks: string | null
-  description: string
-}
-
-const ORG_TYPE_BN: Record<string, string> = {
-  PUBLISHER: 'প্রকাশনা',
-  SELLER: 'বিক্রেতা',
-  PUBLISHER_AND_SELLER: 'প্রকাশনা ও বিক্রয়',
-  ARTIST: 'রঙ্গ (শিল্পী)',
-  ARTISAN: 'সোনাঝুরি (কারিগর)',
+const STATUS_BN: Record<PublisherApp['status'], string> = {
+  pending: 'মুলতুবি',
+  approved: 'অনুমোদিত',
+  rejected: 'প্রত্যাখ্যাত',
 }
 
 export default function ApplicationDetailScreen() {
-  const { id, item: itemParam } = useLocalSearchParams<{ id: string; item?: string }>()
+  const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState<'APPROVE' | 'REJECT' | null>(null)
 
-  const app: AppItem | null = useMemo(() => {
-    try {
-      return itemParam ? (JSON.parse(itemParam) as AppItem) : null
-    } catch {
-      return null
-    }
-  }, [itemParam])
+  // No get-by-id on this endpoint either — look the application up in the
+  // list so the screen never acts on a stale serialised copy.
+  const { data: app, loading, error, refresh } = useApiQuery(
+    () => findInPagedList<PublisherApp>(id, (page) => fetchPublisherAppsPage(page, 'all', 50)),
+    [id]
+  )
 
   async function act(action: 'APPROVE' | 'REJECT') {
     setSubmitting(action)
@@ -55,6 +43,8 @@ export default function ApplicationDetailScreen() {
     }
   }
 
+  if (loading) return <LoadingView />
+  if (error) return <ErrorState message={error} onRetry={refresh} />
   if (!app) {
     return (
       <View style={styles.center}>
@@ -66,16 +56,30 @@ export default function ApplicationDetailScreen() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.parchment }} contentContainerStyle={styles.content}>
       <Text style={styles.title}>{app.nameBn}</Text>
-      <Badge label={ORG_TYPE_BN[app.type] ?? app.type} tone="navy" />
+      <View style={styles.badgeRow}>
+        <Badge label={ORG_TYPE_BN[app.type] ?? app.type} tone="navy" />
+        <Badge
+          label={STATUS_BN[app.status]}
+          tone={app.status === 'pending' ? 'warning' : app.status === 'approved' ? 'success' : 'error'}
+        />
+      </View>
 
-      <Card style={{ gap: spacing.xs }}>
+      <Card style={{ gap: spacing.sm }}>
         <Field label="ইংরেজি নাম" value={app.nameEn} />
         <Field label="দেশ" value={app.country} />
         <Field label="ফোন" value={app.phone} />
         <Field label="ইমেইল" value={app.email ?? '—'} />
         <Field label="ওয়েবসাইট" value={app.website ?? '—'} />
         <Field label="নিবন্ধন নম্বর" value={app.registrationNumber ?? '—'} />
+        <Field label="আবেদনের তারিখ" value={formatDateBn(app.createdAt)} />
       </Card>
+
+      {app.representativeBooks ? (
+        <Card>
+          <Text style={styles.fieldLabel}>প্রতিনিধিত্বমূলক বই</Text>
+          <Text style={styles.body}>{app.representativeBooks}</Text>
+        </Card>
+      ) : null}
 
       {app.description ? (
         <Card>
@@ -84,19 +88,40 @@ export default function ApplicationDetailScreen() {
         </Card>
       ) : null}
 
-      <TextInput
-        style={styles.textArea}
-        placeholder="অনুমোদন/প্রত্যাখ্যানের মন্তব্য (ঐচ্ছিক)"
-        placeholderTextColor={colors.secondary}
-        multiline
-        value={note}
-        onChangeText={setNote}
-      />
+      {app.reviewNote ? (
+        <Card>
+          <Text style={styles.fieldLabel}>পর্যালোচনার মন্তব্য</Text>
+          <Text style={styles.body}>{app.reviewNote}</Text>
+        </Card>
+      ) : null}
 
-      <View style={styles.actions}>
-        <Button label="অনুমোদন করুন" onPress={() => act('APPROVE')} loading={submitting === 'APPROVE'} disabled={!!submitting} />
-        <Button label="প্রত্যাখ্যান করুন" variant="danger" onPress={() => act('REJECT')} loading={submitting === 'REJECT'} disabled={!!submitting} />
-      </View>
+      {app.status === 'pending' ? (
+        <>
+          <TextInput
+            style={styles.textArea}
+            placeholder="অনুমোদন/প্রত্যাখ্যানের মন্তব্য (ঐচ্ছিক)"
+            placeholderTextColor={colors.secondary}
+            multiline
+            value={note}
+            onChangeText={setNote}
+          />
+          <View style={styles.actions}>
+            <Button label="অনুমোদন করুন" onPress={() => act('APPROVE')} loading={submitting === 'APPROVE'} disabled={!!submitting} />
+            <Button
+              label="প্রত্যাখ্যান করুন"
+              variant="danger"
+              onPress={() => act('REJECT')}
+              loading={submitting === 'REJECT'}
+              disabled={!!submitting}
+            />
+          </View>
+        </>
+      ) : (
+        <Text style={styles.meta}>
+          এই আবেদনটি ইতিমধ্যে {STATUS_BN[app.status]} হয়েছে
+          {app.organization ? ` — স্টল: ${app.organization.nameBn}` : ''}।
+        </Text>
+      )}
     </ScrollView>
   )
 }
@@ -114,8 +139,10 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.parchment },
   title: { fontFamily: fonts.serifBold, fontSize: 22, color: colors.heading },
+  badgeRow: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
   fieldLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.secondary },
   body: { fontFamily: fonts.sansRegular, fontSize: 14, color: colors.body, lineHeight: 20 },
+  meta: { fontFamily: fonts.sansRegular, fontSize: 13, color: colors.secondary },
   textArea: {
     borderWidth: 1,
     borderColor: colors.border,

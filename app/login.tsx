@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { ApiError } from '@/lib/api'
 import { colors, fonts, radius, spacing } from '@/lib/theme'
 import type { OtpTarget } from '@/lib/auth-api'
+import { digitsOnly } from '@/lib/digits'
 
 export default function Login() {
   const insets = useSafeAreaInsets()
@@ -20,14 +21,32 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const canSubmit = method === 'phone' ? phone.trim().length >= 6 : /\S+@\S+\.\S+/.test(email)
+  // +91 numbers are 10 digits, +880 mobiles 10 (without the leading 0) or 11.
+  const phoneMaxLength = countryCode === '91' ? 10 : 11
+  const phoneMinLength = 10
+
+  // Digits only, everywhere. The numeric keypads still offer +, *, # and
+  // spaces, and a paste can carry anything at all, so the value is filtered
+  // on the way in rather than validated on the way out.
+  function handlePhoneChange(text: string) {
+    setPhone(digitsOnly(text).slice(0, phoneMaxLength))
+  }
+
+  function handleCountryCode(next: '91' | '880') {
+    setCountryCode(next)
+    // 11 digits typed for +880 must not silently survive a switch to +91.
+    setPhone((current) => current.slice(0, next === '91' ? 10 : 11))
+  }
+
+  const canSubmit =
+    method === 'phone' ? phone.length >= phoneMinLength && phone.length <= phoneMaxLength : /\S+@\S+\.\S+/.test(email)
 
   async function handleSubmit() {
     setError(null)
     setLoading(true)
     try {
       const target: OtpTarget =
-        method === 'phone' ? { method: 'phone', phone: phone.trim(), countryCode } : { method: 'email', email: email.trim() }
+        method === 'phone' ? { method: 'phone', phone, countryCode } : { method: 'email', email: email.trim() }
       await requestOtp(target)
       router.push({ pathname: '/otp', params: { ...target } })
     } catch (err) {
@@ -52,16 +71,20 @@ export default function Login() {
         {method === 'phone' ? (
           <View style={styles.phoneRow}>
             <View style={styles.codePicker}>
-              <SegmentButton label="+91" active={countryCode === '91'} onPress={() => setCountryCode('91')} compact />
-              <SegmentButton label="+880" active={countryCode === '880'} onPress={() => setCountryCode('880')} compact />
+              <SegmentButton label="+91" active={countryCode === '91'} onPress={() => handleCountryCode('91')} compact />
+              <SegmentButton label="+880" active={countryCode === '880'} onPress={() => handleCountryCode('880')} compact />
             </View>
             <TextInput
               style={[styles.input, styles.inputFlex]}
               placeholder="ফোন নম্বর"
               placeholderTextColor={colors.secondary}
-              keyboardType="phone-pad"
+              keyboardType="number-pad"
+              inputMode="numeric"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              maxLength={phoneMaxLength}
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={handlePhoneChange}
             />
           </View>
         ) : (

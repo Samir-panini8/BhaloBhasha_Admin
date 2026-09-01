@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
-import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from 'react-native'
+import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Badge } from '@/components/Badge'
 import { ListRow } from '@/components/ListRow'
 import { LoadingView, ErrorState, EmptyState } from '@/components/States'
 import { api } from '@/lib/api'
-import { useApiQuery } from '@/lib/use-api-query'
+import { useApiInfinite } from '@/lib/use-api-query'
 import { colors, fonts, spacing } from '@/lib/theme'
 
 type FilterType = 'all' | 'review' | 'article' | 'image' | 'ebook_comment'
@@ -34,20 +34,40 @@ interface ModerationItem {
 }
 
 interface ModerationResponse {
-  data: { items: ModerationItem[]; counts: Record<string, number> }
+  data: {
+    items: ModerationItem[]
+    counts: Record<string, number>
+    pagination: { page: number; perPage: number; totalItems: number; totalPages: number }
+  }
+}
+
+const PER_PAGE = 25
+
+/** The API's count keys are camelCase while its filter values are snake_case. */
+function countKey(filter: FilterType): string {
+  return filter === 'ebook_comment' ? 'ebookComment' : filter
 }
 
 export default function ModerationQueue() {
   const router = useRouter()
   const [filter, setFilter] = useState<FilterType>('all')
 
-  const { data, loading, refreshing, error, refresh } = useApiQuery(
-    () => api.get<ModerationResponse>(`/api/admin/moderation?type=${filter}`),
+  const [counts, setCounts] = useState<Record<string, number>>({})
+
+  const query = useApiInfinite<ModerationItem>(
+    async (page) => {
+      const res = await api.get<ModerationResponse>(
+        `/api/admin/moderation?type=${filter}&page=${page}&perPage=${PER_PAGE}`
+      )
+      setCounts(res.data?.counts ?? {})
+      return {
+        items: res.data?.items ?? [],
+        total: res.data?.pagination?.totalItems,
+        hasMore: page < (res.data?.pagination?.totalPages ?? 1),
+      }
+    },
     [filter]
   )
-
-  const items = data?.data.items ?? []
-  const counts = data?.data.counts ?? {}
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.parchment }}>
@@ -56,25 +76,33 @@ export default function ModerationQueue() {
           <Pressable key={f.key} onPress={() => setFilter(f.key)} style={[styles.filterChip, filter === f.key && styles.filterChipActive]}>
             <Text style={[styles.filterLabel, filter === f.key && styles.filterLabelActive]}>
               {f.label}
-              {counts[f.key === 'all' ? 'all' : f.key === 'ebook_comment' ? 'ebookComment' : f.key] != null
-                ? ` (${counts[f.key === 'all' ? 'all' : f.key === 'ebook_comment' ? 'ebookComment' : f.key]})`
-                : ''}
+              {counts[countKey(f.key)] != null ? ` (${counts[countKey(f.key)]})` : ''}
             </Text>
           </Pressable>
         ))}
       </View>
 
-      {loading ? (
+      {query.loading && query.items.length === 0 ? (
         <LoadingView />
-      ) : error ? (
-        <ErrorState message={error} onRetry={refresh} />
-      ) : items.length === 0 ? (
-        <EmptyState icon="checkmark-done-outline" title="সারি খালি" subtitle="এই মুহূর্তে পর্যালোচনার জন্য কিছু নেই" />
+      ) : query.error && query.items.length === 0 ? (
+        <ErrorState message={query.error} onRetry={query.reload} />
       ) : (
         <FlatList
-          data={items}
+          data={query.items}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.navy} />}
+          refreshControl={<RefreshControl refreshing={query.refreshing} onRefresh={query.refresh} tintColor={colors.navy} />}
+          onEndReached={query.loadMore}
+          onEndReachedThreshold={0.4}
+          ListEmptyComponent={
+            <EmptyState icon="checkmark-done-outline" title="সারি খালি" subtitle="এই মুহূর্তে পর্যালোচনার জন্য কিছু নেই" />
+          }
+          ListFooterComponent={
+            query.loadingMore ? (
+              <ActivityIndicator color={colors.navy} style={{ marginVertical: spacing.lg }} />
+            ) : !query.hasMore && query.items.length > 0 ? (
+              <Text style={styles.endLine}>তালিকা শেষ</Text>
+            ) : null
+          }
           renderItem={({ item }) => (
             <ListRow
               title={item.title}
@@ -95,4 +123,5 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: colors.navy },
   filterLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.navy },
   filterLabelActive: { color: colors.white },
+  endLine: { fontFamily: fonts.sansRegular, fontSize: 12, color: colors.secondary, textAlign: 'center', marginVertical: spacing.lg },
 })

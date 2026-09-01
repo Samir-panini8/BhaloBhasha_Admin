@@ -19,6 +19,13 @@ interface AuthContextValue {
   clearPersonaChoice: () => void
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  /**
+   * Re-reads just the stall list (name, logo, type, seat) without touching
+   * the persona or the signed-in status. Screens that show a stall's own
+   * details call this on focus, so an edit made on the website — or on this
+   * phone — shows up without a restart.
+   */
+  refreshOrganizations: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -46,13 +53,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let memberships: OrgMembership[] = []
     if (me.user.roles.includes('PUBLISHER')) {
       const orgs = await authApi.fetchMyOrganizations()
+      // Only what the endpoint actually returns. `isVerified`/`isActive`
+      // used to be hardcoded here (undefined / true), which meant a
+      // deactivated stall still looked active in the app forever.
       memberships = orgs.data.organizations.map((o) => ({
         organization: {
           id: o.id,
           nameBn: o.nameBn,
+          slug: o.slug,
           type: o.type,
-          isVerified: undefined,
-          isActive: true,
+          typeLabel: o.typeLabel,
+          logoUrl: o.logoUrl,
         },
         role: o.role,
       }))
@@ -83,6 +94,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setStatus('signedIn')
   }, [])
+
+  const refreshOrganizations = useCallback(async () => {
+    if (!user?.roles.includes('PUBLISHER')) return
+    try {
+      const orgs = await authApi.fetchMyOrganizations()
+      setOrgMemberships(
+        orgs.data.organizations.map((o) => ({
+          organization: {
+            id: o.id,
+            nameBn: o.nameBn,
+            slug: o.slug,
+            type: o.type,
+            typeLabel: o.typeLabel,
+            logoUrl: o.logoUrl,
+          },
+          role: o.role,
+        }))
+      )
+    } catch {
+      // Best-effort: the screen keeps whatever it already had.
+    }
+  }, [user])
 
   useEffect(() => {
     setOnUnauthorized(() => {
@@ -152,8 +185,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearPersonaChoice,
       signOut,
       refreshProfile: loadProfile,
+      refreshOrganizations,
     }),
-    [status, user, orgMemberships, persona, verifyOtp, choosePersona, clearPersonaChoice, signOut, loadProfile]
+    [status, user, orgMemberships, persona, verifyOtp, choosePersona, clearPersonaChoice, signOut, loadProfile, refreshOrganizations]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

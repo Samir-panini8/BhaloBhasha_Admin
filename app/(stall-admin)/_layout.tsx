@@ -30,6 +30,10 @@ export default function StallAdminLayout() {
         options={{ title: 'ক্যাটালগ', tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" size={size} color={color} /> }}
       />
       <Tabs.Screen
+        name="orders"
+        options={{ title: 'অর্ডার', tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" size={size} color={color} /> }}
+      />
+      <Tabs.Screen
         name="revenue"
         options={{ title: 'আয়', tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} /> }}
       />
@@ -37,6 +41,8 @@ export default function StallAdminLayout() {
         name="more"
         options={{ title: 'আরও', tabBarIcon: ({ color, size }) => <Ionicons name="ellipsis-horizontal-circle-outline" size={size} color={color} /> }}
       />
+      {/* Reachable from "আরও" — href: null keeps it out of the tab bar. */}
+      <Tabs.Screen name="stall-profile" options={{ href: null }} />
     </Tabs>
   )
 }

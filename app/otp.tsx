@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { ApiError } from '@/lib/api'
 import { colors, fonts, radius, spacing } from '@/lib/theme'
 import type { OtpTarget } from '@/lib/auth-api'
+import { digitsOnly } from '@/lib/digits'
 
 export default function Otp() {
   const insets = useSafeAreaInsets()
@@ -27,11 +28,11 @@ export default function Otp() {
   const destination = params.method === 'email' ? params.email : `+${params.countryCode} ${params.phone}`
 
   async function handleVerify() {
-    if (otp.trim().length < 4) return
+    if (otp.length < 4) return
     setError(null)
     setLoading(true)
     try {
-      await verifyOtp({ ...target, otp: otp.trim() } as any)
+      await verifyOtp({ ...target, otp } as any)
       router.replace('/')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'ওটিপি যাচাই করা যায়নি')
@@ -62,15 +63,18 @@ export default function Otp() {
         placeholder="——————"
         placeholderTextColor={colors.secondary}
         keyboardType="number-pad"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        textContentType="oneTimeCode"
         maxLength={6}
         value={otp}
-        onChangeText={setOtp}
+        onChangeText={(text) => setOtp(digitsOnly(text).slice(0, 6))}
         autoFocus
       />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Button label="যাচাই করুন" onPress={handleVerify} loading={loading} disabled={otp.trim().length < 4} style={{ marginTop: spacing.lg }} />
+      <Button label="যাচাই করুন" onPress={handleVerify} loading={loading} disabled={otp.length < 4} style={{ marginTop: spacing.lg }} />
 
       <Pressable onPress={handleResend} disabled={resending} style={{ marginTop: spacing.lg, alignSelf: 'center' }}>
         <Text style={styles.resend}>{resending ? 'পাঠানো হচ্ছে...' : 'আবার কোড পাঠান'}</Text>

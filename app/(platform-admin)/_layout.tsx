@@ -23,7 +23,11 @@ export default function PlatformAdminLayout() {
     >
       <Tabs.Screen
         name="dashboard"
-        options={{ title: 'ড্যাশবোর্ড', tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} /> }}
+        options={{ title: 'হোম', tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} /> }}
+      />
+      <Tabs.Screen
+        name="orders"
+        options={{ title: 'অর্ডার', tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" size={size} color={color} /> }}
       />
       <Tabs.Screen
         name="moderation"

@@ -1,27 +1,32 @@
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { ScrollView, View, Text, TextInput, StyleSheet, Alert } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Card } from '@/components/Card'
+import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
+import { LoadingView, ErrorState } from '@/components/States'
 import { api, ApiError } from '@/lib/api'
+import { useApiQuery } from '@/lib/use-api-query'
+import { findInPagedList } from '@/lib/find-in-list'
+import { formatDateBn } from '@/lib/types'
 import { colors, fonts, spacing } from '@/lib/theme'
-import type { ReportItem } from './index'
+import { CONTENT_TYPE_BN, fetchReportsPage, type ReportItem } from './index'
 
 type Action = 'DISMISS' | 'REMOVE_CONTENT' | 'WARN_USER' | 'SUSPEND_USER'
 
 export default function ReportDetailScreen() {
-  const { id, item: itemParam } = useLocalSearchParams<{ id: string; item?: string }>()
+  const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState<Action | null>(null)
 
-  const item: ReportItem | null = useMemo(() => {
-    try {
-      return itemParam ? (JSON.parse(itemParam) as ReportItem) : null
-    } catch {
-      return null
-    }
-  }, [itemParam])
+  // /api/admin/reports has no get-by-id, so the row is looked up in the
+  // list (which embeds the reported content) — never read from the url.
+  const { data, loading, error, refresh } = useApiQuery(
+    () => findInPagedList<ReportItem>(id, (page) => fetchReportsPage(page, undefined, 50)),
+    [id]
+  )
+  const item = data
 
   async function act(action: Action) {
     setSubmitting(action)
@@ -35,6 +40,8 @@ export default function ReportDetailScreen() {
     }
   }
 
+  if (loading) return <LoadingView />
+  if (error) return <ErrorState message={error} onRetry={refresh} />
   if (!item) {
     return (
       <View style={styles.center}>
@@ -48,7 +55,14 @@ export default function ReportDetailScreen() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.parchment }} contentContainerStyle={styles.content}>
       <Text style={styles.reason}>কারণ: {item.reason || 'উল্লেখ নেই'}</Text>
-      <Text style={styles.meta}>রিপোর্টার: {item.reporter?.nameBn ?? 'অজানা'}</Text>
+      <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
+        <Badge label={CONTENT_TYPE_BN[item.contentType] ?? item.contentType} tone="navy" />
+        <Badge label={item.status === 'OPEN' ? 'খোলা' : 'পর্যালোচিত'} tone={item.status === 'OPEN' ? 'warning' : 'neutral'} />
+      </View>
+      <Text style={styles.meta}>
+        রিপোর্টার: {item.reporter?.nameBn ?? 'অজানা'} · {formatDateBn(item.createdAt)}
+      </Text>
+      {item.description ? <Text style={styles.body}>{item.description}</Text> : null}
 
       {content ? (
         <Card>
@@ -92,7 +106,9 @@ export default function ReportDetailScreen() {
           </View>
         </>
       ) : (
-        <Text style={styles.meta}>এই রিপোর্টটি ইতিমধ্যে পর্যালোচিত হয়েছে।</Text>
+        <Text style={styles.meta}>
+          এই রিপোর্টটি ইতিমধ্যে পর্যালোচিত হয়েছে{item.reviewer?.nameBn ? ` — ${item.reviewer.nameBn}` : ''}।
+        </Text>
       )}
     </ScrollView>
   )

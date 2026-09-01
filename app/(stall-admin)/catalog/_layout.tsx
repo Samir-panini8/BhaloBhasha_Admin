@@ -12,7 +12,8 @@ export default function CatalogLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: 'ক্যাটালগ' }} />
-      <Stack.Screen name="[id]" options={{ title: 'বিবরণ' }} />
+      <Stack.Screen name="new" options={{ title: 'নতুন পণ্য' }} />
+      <Stack.Screen name="[id]" options={{ title: 'সম্পাদনা' }} />
     </Stack>
   )
 }

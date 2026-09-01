@@ -1,12 +1,16 @@
 import React, { useState } from 'react'
-import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from 'react-native'
+import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Badge } from '@/components/Badge'
 import { ListRow } from '@/components/ListRow'
+import { Chip, ChipRow } from '@/components/Field'
 import { LoadingView, ErrorState, EmptyState } from '@/components/States'
 import { api } from '@/lib/api'
-import { useApiQuery } from '@/lib/use-api-query'
+import { useApiInfinite } from '@/lib/use-api-query'
+import { formatDateBn } from '@/lib/types'
 import { colors, fonts, spacing } from '@/lib/theme'
+
+const PER_PAGE = 25
 
 type StatusFilter = 'OPEN' | 'REVIEWED'
 
@@ -15,61 +19,94 @@ export interface ReportItem {
   contentType: string
   reason: string
   status: string
+  description?: string | null
   createdAt: string
   reporter: { nameBn: string } | null
+  reviewer?: { nameBn: string } | null
   reportedContent: Record<string, unknown> | null
 }
 
-interface ReportsResponse {
-  data: { items: ReportItem[]; openCount: number }
-}
-
-const CONTENT_TYPE_BN: Record<string, string> = {
+export const CONTENT_TYPE_BN: Record<string, string> = {
   REVIEW: 'রিভিউ',
   ARTICLE: 'লেখা',
   IMAGE: 'ছবি',
   USER: 'ব্যবহারকারী',
+  EBOOK_COMMENT: 'ই-বুক মন্তব্য',
+}
+
+/** Fetches one page of reports. Shared with the detail screen's lookup. */
+export async function fetchReportsPage(page: number, status?: StatusFilter, perPage = PER_PAGE) {
+  const params = new URLSearchParams({ page: String(page), perPage: String(perPage) })
+  if (status) params.set('status', status)
+  const res = await api.get<{
+    data: { items: ReportItem[]; openCount: number; pagination: { page: number; totalPages: number; totalItems: number } }
+  }>(`/api/admin/reports?${params.toString()}`)
+  return {
+    items: res.data?.items ?? [],
+    openCount: res.data?.openCount ?? 0,
+    total: res.data?.pagination?.totalItems,
+    hasMore: page < (res.data?.pagination?.totalPages ?? 1),
+  }
 }
 
 export default function ReportsScreen() {
   const router = useRouter()
   const [status, setStatus] = useState<StatusFilter>('OPEN')
+  const [openCount, setOpenCount] = useState<number | null>(null)
 
-  const { data, loading, refreshing, error, refresh } = useApiQuery(
-    () => api.get<ReportsResponse>(`/api/admin/reports?status=${status}`),
+  const query = useApiInfinite<ReportItem>(
+    async (page) => {
+      const res = await fetchReportsPage(page, status)
+      setOpenCount(res.openCount)
+      return { items: res.items, total: res.total, hasMore: res.hasMore }
+    },
     [status]
   )
-
-  const items = data?.data.items ?? []
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.parchment }}>
       <View style={styles.filterRow}>
-        <Pressable onPress={() => setStatus('OPEN')} style={[styles.chip, status === 'OPEN' && styles.chipActive]}>
-          <Text style={[styles.chipLabel, status === 'OPEN' && styles.chipLabelActive]}>খোলা {data ? `(${data.data.openCount})` : ''}</Text>
-        </Pressable>
-        <Pressable onPress={() => setStatus('REVIEWED')} style={[styles.chip, status === 'REVIEWED' && styles.chipActive]}>
-          <Text style={[styles.chipLabel, status === 'REVIEWED' && styles.chipLabelActive]}>পর্যালোচিত</Text>
-        </Pressable>
+        <ChipRow>
+          <Chip
+            label={`খোলা${openCount != null ? ` (${openCount})` : ''}`}
+            active={status === 'OPEN'}
+            onPress={() => setStatus('OPEN')}
+          />
+          <Chip label="পর্যালোচিত" active={status === 'REVIEWED'} onPress={() => setStatus('REVIEWED')} />
+        </ChipRow>
       </View>
 
-      {loading ? (
+      {query.loading && query.items.length === 0 ? (
         <LoadingView />
-      ) : error ? (
-        <ErrorState message={error} onRetry={refresh} />
-      ) : items.length === 0 ? (
-        <EmptyState icon="flag-outline" title="কোনো রিপোর্ট নেই" />
+      ) : query.error && query.items.length === 0 ? (
+        <ErrorState message={query.error} onRetry={query.reload} />
       ) : (
         <FlatList
-          data={items}
+          data={query.items}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.navy} />}
+          refreshControl={<RefreshControl refreshing={query.refreshing} onRefresh={query.refresh} tintColor={colors.navy} />}
+          onEndReached={query.loadMore}
+          onEndReachedThreshold={0.4}
+          ListEmptyComponent={<EmptyState icon="flag-outline" title="কোনো রিপোর্ট নেই" />}
+          ListFooterComponent={
+            query.loadingMore ? (
+              <ActivityIndicator color={colors.navy} style={{ marginVertical: spacing.lg }} />
+            ) : !query.hasMore && query.items.length > 0 ? (
+              <Text style={styles.endLine}>তালিকা শেষ</Text>
+            ) : null
+          }
           renderItem={({ item }) => (
             <ListRow
               title={item.reason || 'কারণ উল্লেখ নেই'}
-              subtitle={`${item.reporter?.nameBn ?? 'অজানা'} রিপোর্ট করেছেন`}
-              right={<Badge label={CONTENT_TYPE_BN[item.contentType] ?? item.contentType} tone={item.status === 'OPEN' ? 'warning' : 'neutral'} />}
-              onPress={() => router.push({ pathname: '/(platform-admin)/reports/[id]', params: { id: item.id, item: JSON.stringify(item) } })}
+              subtitle={`${item.reporter?.nameBn ?? 'অজানা'} · ${formatDateBn(item.createdAt)}`}
+              right={
+                <Badge
+                  label={CONTENT_TYPE_BN[item.contentType] ?? item.contentType}
+                  tone={item.status === 'OPEN' ? 'warning' : 'neutral'}
+                />
+              }
+              // Only the id travels — the detail screen fetches live data.
+              onPress={() => router.push(`/(platform-admin)/reports/${item.id}`)}
             />
           )}
         />
@@ -79,9 +116,11 @@ export default function ReportsScreen() {
 }
 
 const styles = StyleSheet.create({
-  filterRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.white, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  chip: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.navyMist },
-  chipActive: { backgroundColor: colors.navy },
-  chipLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.navy },
-  chipLabelActive: { color: colors.white },
+  filterRow: {
+    padding: spacing.md,
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  endLine: { fontFamily: fonts.sansRegular, fontSize: 12, color: colors.secondary, textAlign: 'center', marginVertical: spacing.lg },
 })

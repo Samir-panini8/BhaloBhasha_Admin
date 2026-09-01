@@ -107,7 +107,7 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
   }
 
   const text = await res.text()
-  const data = text ? JSON.parse(text) : null
+  const data = text ? safeParse(text) : null
 
   if (!res.ok) {
     const message = (data && (data.error || data.message)) || `Request failed (${res.status})`
@@ -122,5 +122,62 @@ export const api = {
   post: <T = unknown>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'POST', body }),
   patch: <T = unknown>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'PATCH', body }),
   put: <T = unknown>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'PUT', body }),
-  delete: <T = unknown>(path: string) => apiRequest<T>(path, { method: 'DELETE' }),
+  // Some admin routes take their target in a DELETE body (organization
+  // members, for instance) rather than in the path.
+  delete: <T = unknown>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'DELETE', body }),
+}
+
+/**
+ * Uploads one local file (a picker result) to the site's public asset bucket
+ * and returns the CDN url. Multipart, so it deliberately bypasses
+ * `apiRequest` — that helper always JSON-encodes the body and sets a
+ * content-type, and fetch must be left to write its own multipart boundary.
+ *
+ * The server only accepts urls from its own bucket back in `images[]` /
+ * `logoUrl` (see isUploadedAssetUrl on the backend), so a form must upload
+ * first and submit the returned url — never a local file:// path.
+ */
+export async function uploadAsset(
+  file: { uri: string; name: string; type: string },
+  folder = 'book-covers',
+  options: { retried?: boolean } = {}
+): Promise<string> {
+  const { accessToken } = await getTokens()
+
+  const form = new FormData()
+  // RN's FormData takes this {uri,name,type} shape rather than a File.
+  form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob)
+  form.append('folder', folder)
+
+  const headers: Record<string, string> = { [MOBILE_CLIENT_HEADER]: 'mobile' }
+  if (accessToken) headers.authorization = `Bearer ${accessToken}`
+
+  const res = await fetch(`${BASE_URL}/api/upload`, { method: 'POST', headers, body: form })
+
+  if (res.status === 401 && !options.retried) {
+    const newToken = await refreshAccessToken()
+    if (newToken) return uploadAsset(file, folder, { retried: true })
+    await clearTokens()
+    onUnauthorized?.()
+    throw new ApiError(401, 'সেশন শেষ হয়ে গেছে, আবার লগইন করুন')
+  }
+
+  const text = await res.text()
+  const data = text ? safeParse(text) : null
+  if (!res.ok) {
+    throw new ApiError(res.status, (data && (data.error || data.message)) || 'আপলোড ব্যর্থ', data)
+  }
+  const fileUrl = data?.fileUrl
+  if (typeof fileUrl !== 'string') throw new ApiError(500, 'আপলোড ব্যর্থ — সার্ভার ঠিকানা পাঠায়নি', data)
+  return fileUrl
+}
+
+// A proxy or captive portal can answer 200 with HTML; JSON.parse on that
+// throws a bare SyntaxError that screens would report as a network problem.
+function safeParse(text: string): any {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
 }
