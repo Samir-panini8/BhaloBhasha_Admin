@@ -42,9 +42,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "permissions": ["android.permission.RECORD_AUDIO"],
+      "versionCode": 7
     },
     "web": {
       "favicon": "./assets/favicon.png",
