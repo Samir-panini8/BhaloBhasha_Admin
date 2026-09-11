@@ -35,7 +35,7 @@ export default function AdminDashboard() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.parchment }}>
-      <ScreenHeader title="প্ল্যাটফর্ম ড্যাশবোর্ড" subtitle="ভালো ভাষা — সব পরিসংখ্যান এক নজরে" />
+      <ScreenHeader title="প্ল্যাটফর্ম ড্যাশবোর্ড" subtitle="Fair Bengal — সব পরিসংখ্যান এক নজরে" />
       {loading ? (
         <LoadingView />
       ) : error && !data ? (

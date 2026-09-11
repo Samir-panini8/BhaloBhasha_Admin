@@ -1,15 +1,28 @@
 import { apiRequest } from './api'
 import type { AuthUser, OrgMembership } from './types'
 
+// 'phone' is SMS — the name predates WhatsApp, and 'whatsapp' is the same
+// phone identity delivered over the other transport (the backend keys both
+// on the same E.164 number). Never an identity choice, only a delivery one.
 export type OtpTarget =
   | { method: 'phone'; phone: string; countryCode: '91' | '880' }
+  | { method: 'whatsapp'; phone: string; countryCode: '91' | '880' }
   | { method: 'email'; email: string }
 
 export function requestOtp(target: OtpTarget) {
-  return apiRequest<{ success: boolean }>('/api/auth/send-otp', {
+  return apiRequest<{ success: boolean; via?: string }>('/api/auth/send-otp', {
     method: 'POST',
     body: target,
   })
+}
+
+export interface OtpTransports {
+  smsAvailable: boolean
+  whatsappAvailable: boolean
+}
+
+export function fetchOtpTransports() {
+  return apiRequest<{ data: OtpTransports }>('/api/auth/otp-transports', { skipOrgHeader: true })
 }
 
 export interface VerifyOtpResult {

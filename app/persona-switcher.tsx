@@ -29,7 +29,7 @@ export default function PersonaSwitcher() {
 
   const items: Array<{ persona: Persona; title: string; subtitle: string; icon: keyof typeof Ionicons.glyphMap }> = [
     ...(isAdmin
-      ? [{ persona: { kind: 'platform-admin' } as const, title: 'প্ল্যাটফর্ম অ্যাডমিন', subtitle: 'পুরো ভালো ভাষা প্ল্যাটফর্ম পরিচালনা', icon: 'shield-checkmark' as const }]
+      ? [{ persona: { kind: 'platform-admin' } as const, title: 'প্ল্যাটফর্ম অ্যাডমিন', subtitle: 'পুরো Fair Bengal প্ল্যাটফর্ম পরিচালনা', icon: 'shield-checkmark' as const }]
       : []),
     ...orgMemberships.map((m) => ({
       persona: { kind: 'stall' as const, orgId: m.organization.id },

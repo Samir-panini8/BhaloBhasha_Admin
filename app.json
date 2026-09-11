@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ভালো ভাষা Admin",
+    "name": "Fair Bengal Admin",
     "slug": "bhalobasha-admin",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -22,7 +22,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "ভালো ভাষা অ্যাডমিন অ্যাপ বই বা পণ্যের ছবি আপলোড করতে আপনার গ্যালারিতে ঢুকতে চায়।"
+          "photosPermission": "Fair Bengal অ্যাডমিন অ্যাপ বই বা পণ্যের ছবি আপলোড করতে আপনার গ্যালারিতে ঢুকতে চায়।"
         }
       ]
     ],
@@ -42,7 +42,9 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.RECORD_AUDIO"],
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "versionCode": 7
     },
     "web": {
@@ -52,8 +54,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "3b7a275b-9e33-4560-9162-e734162139be"
+        "projectId": "d68a1967-2b6a-4707-b4c6-1f3e4e0afb34"
       }
-    }
+    },
+    "owner": "bhalobhashaadmin"
   }
 }

@@ -12,7 +12,12 @@ import { digitsOnly } from '@/lib/digits'
 export default function Otp() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
-  const params = useLocalSearchParams<{ method: 'phone' | 'email'; phone?: string; countryCode?: '91' | '880'; email?: string }>()
+  const params = useLocalSearchParams<{
+    method: 'phone' | 'whatsapp' | 'email'
+    phone?: string
+    countryCode?: '91' | '880'
+    email?: string
+  }>()
   const { verifyOtp, requestOtp } = useAuth()
 
   const [otp, setOtp] = useState('')
@@ -23,9 +28,14 @@ export default function Otp() {
   const target: OtpTarget =
     params.method === 'email'
       ? { method: 'email', email: params.email ?? '' }
-      : { method: 'phone', phone: params.phone ?? '', countryCode: (params.countryCode as '91' | '880') ?? '91' }
+      : {
+          method: params.method === 'whatsapp' ? 'whatsapp' : 'phone',
+          phone: params.phone ?? '',
+          countryCode: (params.countryCode as '91' | '880') ?? '91',
+        }
 
   const destination = params.method === 'email' ? params.email : `+${params.countryCode} ${params.phone}`
+  const viaLabel = params.method === 'whatsapp' ? ' (WhatsApp)' : ''
 
   async function handleVerify() {
     if (otp.length < 4) return
@@ -56,7 +66,10 @@ export default function Otp() {
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + spacing.xxl }]}>
       <Text style={styles.title}>ওটিপি লিখুন</Text>
-      <Text style={styles.subtitle}>{destination}-এ পাঠানো কোডটি লিখুন</Text>
+      <Text style={styles.subtitle}>
+        {destination}
+        {viaLabel}-এ পাঠানো কোডটি লিখুন
+      </Text>
 
       <TextInput
         style={styles.input}

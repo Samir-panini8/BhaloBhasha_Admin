@@ -1,6 +1,6 @@
-# ভালো ভাষা Admin
+# Fair Bengal Admin
 
-React Native + Expo admin app for ভালো ভাষা (Bhalo Bhasha). One app, two personas:
+React Native + Expo admin app for Fair Bengal (formerly ভালো ভাষা / Bhalo Bhasha). One app, two personas:
 
 - **প্ল্যাটফর্ম অ্যাডমিন (Platform Admin)** — site-wide moderation, reports, stall verification/applications, user management.
 - **স্টল অ্যাডমিন (Stall Admin)** — a সেলার/publisher/artisan/artist stall's own dashboard, catalog, and revenue.
@@ -42,6 +42,7 @@ The bhalo-bhasha backend originally authenticated **only** via httpOnly cookies,
 2. **`src/lib/org-roles.ts`** — the multi-stall "active org" switcher now also accepts an `x-active-org` header alongside the existing cookie (same "hint, not authority" validation).
 3. **`src/app/api/auth/verify-otp/route.ts`** and **`src/app/api/auth/refresh/route.ts`** — when the request carries `x-client-platform: mobile`, the token pair is also returned in the JSON body (cookies are still set too, harmlessly, for a client that happens to have a cookie jar).
 4. **`src/app/api/admin/organizations/route.ts`, `.../[id]/route.ts`, `.../[id]/verify/route.ts`** — swapped `requireSession()` (which redirects to `/login` on an expired session — fine for a browser, a broken response for `fetch`) for the `getSession()` + JSON `401` pattern every other admin route already uses.
+5. **`src/app/api/auth/otp-transports/route.ts`** (new) — a public, unauthenticated `GET` exposing `{ smsAvailable, whatsappAvailable }` off `getFeatureFlags()`. The web login page reads those two booleans directly in a server component (`force-dynamic`, so a সংযোগ-panel toggle takes effect immediately); a native client has no server component to do that in, so it fetches them instead. `send-otp` and `verify-otp` already accepted `method: 'whatsapp'` (the web login form's transport picker uses it) — this app just needed a way to know, before the reader picks a method, whether WhatsApp/SMS delivery is currently switched on.
 
 ## Known limitations / good next steps
 
