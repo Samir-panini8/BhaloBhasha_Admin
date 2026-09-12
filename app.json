@@ -28,13 +28,13 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bhalobasha.admin",
+      "bundleIdentifier": "com.fairbengal.admin",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.bhalobasha.admin",
+      "package": "com.fairbengal.admin",
       "adaptiveIcon": {
         "backgroundColor": "#1B3A5C",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -42,9 +42,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ],
+      "permissions": ["android.permission.RECORD_AUDIO"],
       "versionCode": 7
     },
     "web": {
