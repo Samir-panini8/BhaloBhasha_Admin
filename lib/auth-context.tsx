@@ -15,6 +15,9 @@ interface AuthContextValue {
   needsPersonaChoice: boolean
   requestOtp: typeof authApi.requestOtp
   verifyOtp: (target: Parameters<typeof authApi.verifyOtp>[0]) => Promise<authApi.VerifyOtpResult>
+  loginWithPassword: (target: authApi.PasswordLoginTarget) => Promise<authApi.PasswordLoginResult>
+  forgotPassword: typeof authApi.forgotPassword
+  resetPassword: (target: authApi.ResetPasswordTarget) => Promise<authApi.PasswordLoginResult>
   choosePersona: (persona: Persona) => Promise<void>
   clearPersonaChoice: () => void
   signOut: () => Promise<void>
@@ -151,6 +154,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return result
   }, [loadProfile])
 
+  const loginWithPassword = useCallback<AuthContextValue['loginWithPassword']>(async (target) => {
+    const result = await authApi.loginWithPassword(target)
+    if (result.accessToken && result.refreshToken) {
+      await storage.setTokens(result.accessToken, result.refreshToken)
+    }
+    await loadProfile()
+    return result
+  }, [loadProfile])
+
+  const resetPassword = useCallback<AuthContextValue['resetPassword']>(async (target) => {
+    const result = await authApi.resetPassword(target)
+    if (result.accessToken && result.refreshToken) {
+      await storage.setTokens(result.accessToken, result.refreshToken)
+    }
+    await loadProfile()
+    return result
+  }, [loadProfile])
+
   const choosePersona = useCallback(async (next: Persona) => {
     setPersona(next)
     await storage.setStoredPersonaKey(personaKey(next))
@@ -181,13 +202,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       needsPersonaChoice: status === 'signedIn' && persona === null,
       requestOtp: authApi.requestOtp,
       verifyOtp,
+      loginWithPassword,
+      forgotPassword: authApi.forgotPassword,
+      resetPassword,
       choosePersona,
       clearPersonaChoice,
       signOut,
       refreshProfile: loadProfile,
       refreshOrganizations,
     }),
-    [status, user, orgMemberships, persona, verifyOtp, choosePersona, clearPersonaChoice, signOut, loadProfile, refreshOrganizations]
+    [
+      status,
+      user,
+      orgMemberships,
+      persona,
+      verifyOtp,
+      loginWithPassword,
+      resetPassword,
+      choosePersona,
+      clearPersonaChoice,
+      signOut,
+      loadProfile,
+      refreshOrganizations,
+    ]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

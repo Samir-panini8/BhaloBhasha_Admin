@@ -33,6 +33,9 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="login" />
             <Stack.Screen name="otp" />
+            <Stack.Screen name="login-password" />
+            <Stack.Screen name="forgot-password" />
+            <Stack.Screen name="reset-password" />
             <Stack.Screen name="persona-switcher" />
             <Stack.Screen name="(platform-admin)" />
             <Stack.Screen name="(stall-admin)" />

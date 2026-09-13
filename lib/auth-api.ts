@@ -40,6 +40,53 @@ export function verifyOtp(target: OtpTarget & { otp: string }) {
   })
 }
 
+// Password login is the peer of the OTP flow — phone/email stay PEER
+// identifiers, the caller just proves control with a password instead of a
+// fresh code. Mirrors the website's PasswordLoginForm / /api/auth/login.
+export type PasswordLoginTarget =
+  | { method: 'phone'; phone: string; countryCode: '91' | '880'; password: string }
+  | { method: 'email'; email: string; password: string }
+
+export interface PasswordLoginResult {
+  success: boolean
+  user: { id: string; nameBn: string; roles: AuthUser['roles'] }
+  accessToken?: string
+  refreshToken?: string
+}
+
+export function loginWithPassword(target: PasswordLoginTarget) {
+  return apiRequest<PasswordLoginResult>('/api/auth/login', {
+    method: 'POST',
+    body: target,
+  })
+}
+
+export type ForgotPasswordTarget =
+  | { method: 'phone'; phone: string; countryCode: '91' | '880'; via?: 'sms' | 'whatsapp' }
+  | { method: 'email'; email: string }
+
+// Response is uniform whether or not the identifier has an account — never
+// branch UI copy on it (see the backend route's comment for why).
+export function forgotPassword(target: ForgotPasswordTarget) {
+  return apiRequest<{ success: boolean; message: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: target,
+  })
+}
+
+export type ResetPasswordTarget =
+  | { method: 'phone'; phone: string; countryCode: '91' | '880'; otp: string; newPassword: string }
+  | { method: 'email'; email: string; otp: string; newPassword: string }
+
+// A verified reset code is proof of control, same as verify-otp — success
+// here both sets the password and logs the reader in.
+export function resetPassword(target: ResetPasswordTarget) {
+  return apiRequest<PasswordLoginResult>('/api/auth/reset-password', {
+    method: 'POST',
+    body: target,
+  })
+}
+
 export interface MeResult {
   user: (AuthUser & { stallContext: { orgType: string | null } }) | null
   needsRefresh?: boolean

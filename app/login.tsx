@@ -236,6 +236,10 @@ export default function Login() {
         )}
 
         <Button label="ওটিপি পাঠান" onPress={handleSubmit} disabled={!canSubmit} loading={loading} style={{ marginTop: spacing.lg }} />
+
+        <Pressable onPress={() => router.push('/login-password')} style={{ marginTop: spacing.lg, alignSelf: 'center' }}>
+          <Text style={styles.link}>পাসওয়ার্ড দিয়ে লগইন করুন →</Text>
+        </Pressable>
       </View>
     </KeyboardAvoidingView>
   )
